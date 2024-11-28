@@ -1,0 +1,48 @@
+function collectVotes() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const data = sheet.getDataRange().getValues(); // スプレッドシートのデータを取得
+  
+  const numVoters = data.length - 1; // 投票者の数（1行目はヘッダーなので除外）
+  const numChoices = 9; // 選択肢の数
+  const points = [5, 4, 3, 2, 1]; // ポイント配分
+
+  // 選択肢ごとの点数を保存する配列
+  const scores = Array(numChoices).fill(0);
+
+  // 投票者ごとに順位を取得し点数を加算
+  for (let i = 1; i <= numVoters; i++) {
+    for (let j = 1; j <= numChoices; j++) {
+      const choice = data[i][j]; // 投票者の選択肢（1位、2位など）
+      const pointsIndex = j - 1; // 1位は5点、2位は4点のため、インデックス調整
+      if (choice >= 1 && choice <= numChoices) {
+        scores[choice - 1] += points[pointsIndex];
+      }
+    }
+  }
+
+  // 結果を順位順に並べる
+  const rankedChoices = scores.map((score, index) => ({
+    choice: index + 1, // 選択肢番号
+    score: score
+  }));
+
+  // スコアでソート（降順）
+  rankedChoices.sort((a, b) => b.score - a.score);
+
+  // 結果を表示（スプレッドシートに書き込む）
+  const resultRange = sheet.getRange(numVoters + 2, 1, rankedChoices.length, 2); // 結果の書き込み位置
+  const resultData = rankedChoices.map(item => [item.choice, item.score]);
+
+  // 同点処理
+  let rank = 1;
+  for (let i = 0; i < rankedChoices.length; i++) {
+    if (i > 0 && rankedChoices[i].score === rankedChoices[i - 1].score) {
+      rankedChoices[i].rank = rankedChoices[i - 1].rank; // 同点の場合、順位を合わせる
+    } else {
+      rankedChoices[i].rank = rank++;
+    }
+  }
+
+  resultRange.setValues(rankedChoices.map(item => [item.rank, item.choice, item.score]));
+  Logger.log(rankedChoices);
+}
