@@ -1,48 +1,64 @@
-function collectVotes() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const data = sheet.getDataRange().getValues(); // スプレッドシートのデータを取得
+function calculateVotes() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet();
+  var voteSheet = sheet.getSheetByName("Votes");
+  var resultSheet = sheet.getSheetByName("Results");
   
-  const numVoters = data.length - 1; // 投票者の数（1行目はヘッダーなので除外）
-  const numChoices = 9; // 選択肢の数
-  const points = [5, 4, 3, 2, 1]; // ポイント配分
+  // 投票データの取得
+  var data = voteSheet.getDataRange().getValues();
+  
+  // 投票者数
+  var voterCount = data.length - 1; // 1行目はヘッダー
+  
+  // 得点管理用オブジェクト
+  var scores = {};
+  
+  // 順位に基づく得点の設定
+  var pointMapping = {
+    1: 5,
+    2: 4,
+    3: 3,
+    4: 2,
+    5: 1
+  };
 
-  // 選択肢ごとの点数を保存する配列
-  const scores = Array(numChoices).fill(0);
-
-  // 投票者ごとに順位を取得し点数を加算
-  for (let i = 1; i <= numVoters; i++) {
-    for (let j = 1; j <= numChoices; j++) {
-      const choice = data[i][j]; // 投票者の選択肢（1位、2位など）
-      const pointsIndex = j - 1; // 1位は5点、2位は4点のため、インデックス調整
-      if (choice >= 1 && choice <= numChoices) {
-        scores[choice - 1] += points[pointsIndex];
+  // 各投票者の得点計算
+  for (var i = 1; i < data.length; i++) {
+    for (var j = 1; j <= 5; j++) {
+      var choice = data[i][j];
+      var score = pointMapping[j];
+      if (scores[choice] === undefined) {
+        scores[choice] = 0;
       }
+      scores[choice] += score;
     }
   }
 
-  // 結果を順位順に並べる
-  const rankedChoices = scores.map((score, index) => ({
-    choice: index + 1, // 選択肢番号
-    score: score
-  }));
+  // 得点データを配列に格納
+  var resultData = [];
+  for (var choice in scores) {
+    resultData.push([choice, scores[choice]]);
+  }
 
-  // スコアでソート（降順）
-  rankedChoices.sort((a, b) => b.score - a.score);
-
-  // 結果を表示（スプレッドシートに書き込む）
-  const resultRange = sheet.getRange(numVoters + 2, 1, rankedChoices.length, 2); // 結果の書き込み位置
-  const resultData = rankedChoices.map(item => [item.choice, item.score]);
+  // 得点順に並べ替え (高得点順)
+  resultData.sort(function(a, b) {
+    return b[1] - a[1];
+  });
 
   // 同点処理
-  let rank = 1;
-  for (let i = 0; i < rankedChoices.length; i++) {
-    if (i > 0 && rankedChoices[i].score === rankedChoices[i - 1].score) {
-      rankedChoices[i].rank = rankedChoices[i - 1].rank; // 同点の場合、順位を合わせる
-    } else {
-      rankedChoices[i].rank = rank++;
+  var lastScore = -1;
+  var rank = 1;
+  for (var i = 0; i < resultData.length; i++) {
+    if (resultData[i][1] !== lastScore) {
+      rank = i + 1; // 同点ではない場合順位を更新
     }
+    resultData[i].push(rank);
+    lastScore = resultData[i][1];
   }
 
-  resultRange.setValues(rankedChoices.map(item => [item.rank, item.choice, item.score]));
-  Logger.log(rankedChoices);
+  // 結果シートに出力
+  resultSheet.clear(); // 既存のデータをクリア
+  resultSheet.appendRow(['選択肢名', '得点', '順位']);
+  for (var i = 0; i < resultData.length; i++) {
+    resultSheet.appendRow(resultData[i]);
+  }
 }
